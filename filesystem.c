@@ -66,7 +66,7 @@ void filesystem(char *file)
 	filesystem = map;
 	filesystem -> writeTo = map;
 	filesystem -> map = map;
-
+ 
 
   	initializeFileSystem(filesystem);
 	
@@ -107,7 +107,7 @@ void filesystem(char *file)
 		{
 			if(isdigit(buffer[5]))
 			{
-				//dump(stdout, atoi(buffer + 5));
+				dump(stdout, atoi(buffer + 5), filesystem);
 			}
 			else
 			{
@@ -207,6 +207,23 @@ void filesystem(char *file)
 	free(buffer);
 	buffer = NULL;
 
+}
+
+void dump(FILE* file, int fileno, struct FileSystem* filesystem){
+
+	unsigned char* bytes = filesystem->map+512*fileno;
+	int i=0;
+	while(i<512){
+		if(i%16 == 0 && i%32 != 0){
+			printf("    ");
+		}
+		if(i%32 == 0){
+			printf("\n");
+		}
+		printf("%02X ", (unsigned)bytes[i]);
+		i++;
+	}
+	printf("\n");
 }
 
 void pwd(struct FileSystem* filesystem){

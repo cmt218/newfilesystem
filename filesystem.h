@@ -26,6 +26,7 @@ void ls(struct FileSystem* filesystem);
 void myMkdir(char* dirname, struct FileSystem* filesystem);
 void cd(char* dirname, struct FileSystem* filesystem);
 void pwd(struct FileSystem* filesystem);
+void dump(FILE* file, int fileno, struct FileSystem* filesystem);
 
 //utility prototypes
 void initializeFileSystem(struct FileSystem* filesystem);
