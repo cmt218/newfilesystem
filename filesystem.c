@@ -66,9 +66,12 @@ void filesystem(char *file)
 	filesystem = map;
 	filesystem -> writeTo = map;
 	filesystem -> map = map;
+
+
   	initializeFileSystem(filesystem);
 	
-	checkFAT(filesystem);
+
+	//checkFAT(filesystem);
 	
 	//printf("%p \n", filesystem -> map);
 	//printf("%p \n", filesystem -> writeTo);
@@ -121,11 +124,11 @@ void filesystem(char *file)
 		}
 		else if(!strncmp(buffer, "pwd", 3))
 		{
-			//pwd();
+			pwd(filesystem);
 		}
 		else if(!strncmp(buffer, "cd ", 3))
 		{
-			//cd(buffer+3);
+			cd(buffer+3, filesystem);
 		}
 		else if(!strncmp(buffer, "ls", 2))
 		{
@@ -206,6 +209,78 @@ void filesystem(char *file)
 
 }
 
+void pwd(struct FileSystem* filesystem){
+	
+	/* BEGIN STACK IMPLEMENTATION*/
+	int maxDepth = 20;
+	struct DirectoryPage* path[20];
+	int top = -1;
+	int isempty(){
+		if(top == -1){
+			return 1;
+		}
+		return 0;
+	}
+	int isfull(){
+		if(top == maxDepth){
+			return 1;
+		}
+		return 0;
+	}
+	struct DirectoryPage* peek(){
+		return path[top];
+	}
+	struct DirectoryPage* pop(){
+		struct DirectoryPage* toReturn;
+		if(!isempty()){
+			toReturn = path[top];
+			top --;
+			return toReturn;
+		}
+		return 0;
+	}
+	void push(struct DirectoryPage* data){
+		if(!isfull()){
+			top++;
+			path[top] = data;
+		}
+	}
+	/*END STACK IMPLEMENTATION*/
+
+
+	struct DirectoryPage* tmp = filesystem -> currentDirectory;
+	while(tmp){
+		push(tmp);
+		tmp = tmp -> parent;
+	}
+	tmp = pop();
+	while(tmp){
+		printf("%s", tmp -> name);
+		printf("/");
+		tmp = pop();
+	}
+	printf("\n");
+}
+
+void cd(char* dirname, struct FileSystem* filesystem){
+	//up a directory case
+	if(strcmp(dirname,"..") == 0){
+		if(!(strcmp(dirname, "root") == 0)){
+			filesystem -> currentDirectory = filesystem -> currentDirectory -> parent;
+			return;
+		}
+	}
+
+	//named directory case
+	struct DirectoryPage* tmp = filesystem -> currentDirectory -> childDir;
+	while(tmp){
+		if(strcmp(dirname, tmp->name) == 0){
+			filesystem -> currentDirectory = tmp;
+		}
+		tmp = tmp -> nextDir;
+	}
+
+}
 
 void ls(struct FileSystem* filesystem){
 	printf("current directory: %s \n", filesystem -> currentDirectory -> name);
@@ -222,15 +297,31 @@ void ls(struct FileSystem* filesystem){
 /*make a new directory page and place it correctly in the current directory. 
 EXPECTS: filesystem -> writeTo to be located on a page boundary*/
 void myMkdir(char* dirname, struct FileSystem* filesystem){
+	
+	//duplicate checking
+	struct DirectoryPage* tmp = filesystem -> currentDirectory;
+	if(strcmp(tmp -> name, dirname) == 0){
+		printf("duplicate name \n");
+		return;
+	}
+	tmp = tmp -> childDir;
+	while(tmp){
+		if(strcmp(tmp -> name, dirname) == 0){
+			printf("duplicate name \n");
+			return;
+		}	
+		tmp = tmp -> nextDir;
+	}
+	
 	//create the new directory page and increment write pointer one block
 	struct DirectoryPage* new = filesystem -> writeTo;
 	filesystem -> writeTo += PAGE_SIZE;
 	new -> parent = filesystem -> currentDirectory;
 	strncpy(new -> name, dirname, NAME_MAX);
-	
+
 	//not the first child directory of current directory
 	if(filesystem -> currentDirectory -> childDir){
-		struct DirectoryPage* tmp = filesystem -> currentDirectory -> childDir;
+		tmp = filesystem -> currentDirectory -> childDir;
 		while(tmp -> nextDir){
 			tmp = tmp -> nextDir;
 		}
@@ -269,6 +360,11 @@ void initializeFileSystem(struct FileSystem* filesystem){
 	//pad write pointer so root directory page takes a whole block
 	filesystem -> writeTo += PAGE_SIZE - (sizeof(struct DirectoryPage));
 	
+
+	/******
+	 NEED TO FIX THIS
+	 *******/
+	/* 
 	//reflect these structures in FAT
 	//[cmt] this loop has to be modified if FAT size ever changes
 	FATentry(filesystem, 'r', NULL, 0); // root sector
@@ -278,6 +374,7 @@ void initializeFileSystem(struct FileSystem* filesystem){
 		prev = FATentry(filesystem, 'f', prev, i);
 	}
 	FATentry(filesystem, 'd', NULL, 377); //root directory
+	*/
 }
 
 //updates FAT entry for some page and links from previous if necessary. Argument prev is optional
@@ -326,6 +423,7 @@ void blocksUsed(struct FileSystem* filesystem){
 		printf("writeto not on page boundary");
 	}
 }
+
 
 /*
  * help() - Print a help message.

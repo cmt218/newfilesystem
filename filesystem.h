@@ -24,6 +24,8 @@ char* generateData(char *source, size_t size);
 //prototypes for commands
 void ls(struct FileSystem* filesystem);
 void myMkdir(char* dirname, struct FileSystem* filesystem);
+void cd(char* dirname, struct FileSystem* filesystem);
+void pwd(struct FileSystem* filesystem);
 
 //utility prototypes
 void initializeFileSystem(struct FileSystem* filesystem);
