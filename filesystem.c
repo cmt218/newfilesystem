@@ -43,33 +43,21 @@ char* generateData(char *source, size_t size)
  */
 void filesystem(char *file)
 {
-	/* pointers for the memory-mapped filesystem */
-	void *map;
+
 	struct FileSystem* filesystem;
 	
-	//open/expand file, map memory, handle errors
-	int fd = open(file, O_RDWR | O_CREAT | O_TRUNC, 0777);
-	if (fd == -1){
-        perror("Error opening file for writing");
-        exit(EXIT_FAILURE);
-    } 
-    lseek(fd, FOUR_MB, SEEK_SET);
-    write(fd, "", 1);
-	map = mmap(NULL, FOUR_MB, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (map == MAP_FAILED){
-        close(fd);
-        perror("Error mmapping the file");
-        exit(EXIT_FAILURE);
-    }
+	FILE* test;
+	test = fopen(file, "r");
+	if(test){
+		fclose(test);
+		filesystem = verifyFileSystem(file);
+	}
+	else{
+		filesystem = initializeFileSystem(file);
+	}
 
-	//initialize the filesystem struct into the mapped memory
-	filesystem = map;
-	filesystem -> writeTo = map;
-	filesystem -> map = map;
- 
 
-  	initializeFileSystem(filesystem);
-	
+	//filesystem = initializeFileSystem(file);
 
 	//checkFAT(filesystem);
 	
@@ -350,8 +338,58 @@ void myMkdir(char* dirname, struct FileSystem* filesystem){
 	}
 }
 
+struct FileSystem* verifyFileSystem(char* file){
+	printf("verifying \n");
+
+	struct FileSystem* filesystem;
+	void * map;
+
+	int fd = open(file, O_RDWR, 0777);
+	if (fd == -1){
+        perror("Error opening file for writing");
+        exit(EXIT_FAILURE);
+    }
+    lseek(fd, FOUR_MB, SEEK_SET);
+    write(fd, "", 1);
+    map = mmap(NULL, FOUR_MB, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (map == MAP_FAILED){
+        close(fd);
+        perror("Error mmapping the file");
+        exit(EXIT_FAILURE);
+    }
+
+    filesystem = (struct FileSystem*)map;
+
+	return filesystem;
+}
+
 //currently uses first 377 blocks to initialize the filesystem
-void initializeFileSystem(struct FileSystem* filesystem){
+struct FileSystem* initializeFileSystem(char* file){
+	printf("initializing \n");
+
+	struct FileSystem* filesystem;
+	void* map;
+
+	//open/expand file, map memory, handle errors
+	int fd = open(file, O_RDWR | O_CREAT | O_TRUNC, 0777);
+	if (fd == -1){
+        perror("Error opening file for writing");
+        exit(EXIT_FAILURE);
+    } 
+    lseek(fd, FOUR_MB, SEEK_SET);
+    write(fd, "", 1);
+	map = mmap(NULL, FOUR_MB, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (map == MAP_FAILED){
+        close(fd);
+        perror("Error mmapping the file");
+        exit(EXIT_FAILURE);
+    }
+
+	//initialize the filesystem struct into the mapped memory
+	filesystem = map;
+	filesystem -> writeTo = map;
+	filesystem -> map = map;
+
 	//create a root sector (sector 0) 
 	filesystem -> writeTo += sizeof(struct FileSystem);
 	struct RootSector* sectorZero = filesystem -> writeTo;
@@ -378,6 +416,7 @@ void initializeFileSystem(struct FileSystem* filesystem){
 	filesystem -> writeTo += PAGE_SIZE - (sizeof(struct DirectoryPage));
 	
 
+	return filesystem;
 	/******
 	 NEED TO FIX THIS
 	 *******/

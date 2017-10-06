@@ -29,7 +29,8 @@ void pwd(struct FileSystem* filesystem);
 void dump(FILE* file, int fileno, struct FileSystem* filesystem);
 
 //utility prototypes
-void initializeFileSystem(struct FileSystem* filesystem);
+struct FileSystem* verifyFileSystem(char* file);
+struct FileSystem* initializeFileSystem(char* file);
 void blocksUsed(struct FileSystem* filesystem);
 struct PageNode* FATentry(struct FileSystem* filesystem, char type, struct PageNode* prev, unsigned short index);
 void checkFAT(struct FileSystem* filesystem);
