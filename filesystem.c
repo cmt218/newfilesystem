@@ -57,9 +57,9 @@ void filesystem(char *file)
 	}
 
 
-	//filesystem = initializeFileSystem(file);
-
+	blocksUsed(filesystem);	
 	//checkFAT(filesystem);
+	
 	
 	//printf("%p \n", filesystem -> map);
 	//printf("%p \n", filesystem -> writeTo);
@@ -197,6 +197,11 @@ void filesystem(char *file)
 
 }
 
+void usage(struct FileSystem* filesystem){
+
+}
+
+
 void dump(FILE* file, int fileno, struct FileSystem* filesystem){
 
 	unsigned char* bytes = filesystem->map+512*fileno;
@@ -269,8 +274,8 @@ void pwd(struct FileSystem* filesystem){
 
 void cd(char* dirname, struct FileSystem* filesystem){
 	//up a directory case
-	if(strcmp(dirname,"..") == 0){
-		if(!(strcmp(dirname, "root") == 0)){
+	if(strcmp(dirname,"..") == 0 ){
+		if(!(strcmp(filesystem->currentDirectory->name, "root") == 0)){
 			filesystem -> currentDirectory = filesystem -> currentDirectory -> parent;
 			return;
 		}
@@ -349,21 +354,21 @@ struct FileSystem* verifyFileSystem(char* file){
         perror("Error opening file for writing");
         exit(EXIT_FAILURE);
     }
-    lseek(fd, FOUR_MB, SEEK_SET);
-    write(fd, "", 1);
+    //lseek(fd, FOUR_MB, SEEK_SET);
+    //write(fd, "", 1);
     map = mmap(NULL, FOUR_MB, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (map == MAP_FAILED){
         close(fd);
         perror("Error mmapping the file");
         exit(EXIT_FAILURE);
     }
-
-    filesystem = (struct FileSystem*)map;
-
+	
+  filesystem = (struct FileSystem*)map;
+    
 	return filesystem;
 }
 
-//currently uses first 377 blocks to initialize the filesystem
+//currently uses first 386 blocks to initialize the filesystem
 struct FileSystem* initializeFileSystem(char* file){
 	printf("initializing \n");
 
@@ -415,29 +420,24 @@ struct FileSystem* initializeFileSystem(char* file){
 	//pad write pointer so root directory page takes a whole block
 	filesystem -> writeTo += PAGE_SIZE - (sizeof(struct DirectoryPage));
 	
-
-	return filesystem;
-	/******
-	 NEED TO FIX THIS
-	 *******/
-	/* 
 	//reflect these structures in FAT
 	//[cmt] this loop has to be modified if FAT size ever changes
 	FATentry(filesystem, 'r', NULL, 0); // root sector
-	struct PageNode* prev = FATentry(filesystem, 'f', NULL, 1); //each FAT block
-	int i=0;
-	for(i=2;i<=376;i++){
+	struct PageNode* prev = FATentry(filesystem, 'f', NULL, 1);
+	int i=2;
+	for(i=2;i<=384;i++){
 		prev = FATentry(filesystem, 'f', prev, i);
 	}
-	FATentry(filesystem, 'd', NULL, 377); //root directory
-	*/
+	FATentry(filesystem, 'd', NULL, 385); //root directory
+	
+	return filesystem;
 }
 
 //updates FAT entry for some page and links from previous if necessary. Argument prev is optional
 struct PageNode* FATentry(struct FileSystem* filesystem, char type, struct PageNode* prev, unsigned short index){
 	//index into allocation table
 	struct PageNode* entry = filesystem -> rootSec -> allocationTable -> table;
-	entry += (sizeof(struct PageNode)*index);
+	entry+=index;
 	
 	//update attributes
 	entry -> type = type;
@@ -453,19 +453,17 @@ struct PageNode* FATentry(struct FileSystem* filesystem, char type, struct PageN
 
 //prints out whats in the FAT
 void checkFAT(struct FileSystem* filesystem){
-	
-	struct PageNode* table = filesystem -> rootSec -> allocationTable -> table;
-	struct PageNode use = *table;
+	struct PageNode* cur = filesystem -> rootSec -> allocationTable -> table;
 
-	while(use.type){
-		printf("This: %c %d ", use.type, use.mapindex);
-		if(use.next){
-			printf("Next: %c %d", use.next->type, use.next->mapindex);
+	while(cur->type){
+		printf("This: %c %d ", cur->type, cur->mapindex);
+		if(cur->next){
+			printf("next: %c %d ", cur->next->type, cur->next->mapindex);
 		}
-		printf("\n");
-		table += (sizeof(struct PageNode));
-		use = *table;
+		printf("  %p  \n", cur);
+		cur++;
 	}
+	
 }
 
 //for testing if things are playing nicely

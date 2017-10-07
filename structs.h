@@ -20,6 +20,7 @@ typedef struct FileSystem{
 } Filesystem;
 
 typedef struct RootSector{
+	unsigned short tablePosition;
 	struct FAT* allocationTable;
 	struct DirectoryPage* rootDirectory;
 } RootSector;
@@ -36,10 +37,10 @@ typedef struct PageNode{
 	char type; //NULL->free, d->directory, r->rootsector, f->FAT, x->raw data
 	struct PageNode* next;
 	unsigned short mapindex;
-} Page;
+} PageNode;
 
 typedef struct FAT{
-	struct PageNode table[8000];
+	struct PageNode table[8192];
 } FAT;
 
 
