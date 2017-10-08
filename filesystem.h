@@ -27,6 +27,12 @@ void myMkdir(char* dirname, struct FileSystem* filesystem);
 void cd(char* dirname, struct FileSystem* filesystem);
 void pwd(struct FileSystem* filesystem);
 void dump(FILE* file, int fileno, struct FileSystem* filesystem);
+void usage(struct FileSystem* filesystem);
+//void myWrite(struct FileSystem* filesystem, char* filename, size_t amt, char* data);
+void cat(struct FileSystem* filesystem, char* filename);
+void myWrite(struct FileSystem* filesystem, char* filename, size_t amt, char* data);
+struct FileSystem* SequentialFATentry(struct FileSystem* filesystem, char type, struct PageNode* prev,unsigned short end);
+void append(struct FileSystem* filesystem, char* filename, size_t amt, char* data);
 
 //utility prototypes
 struct FileSystem* verifyFileSystem(char* file);

@@ -15,23 +15,29 @@
 typedef struct FileSystem{
 	void* map;
 	void* writeTo;
+	int blocksUsed;
+	int fileCt;
 	struct DirectoryPage* currentDirectory;
 	struct RootSector* rootSec;
 } Filesystem;
 
 typedef struct RootSector{
-	unsigned short tablePosition;
+	unsigned short currenttableposition;
 	struct FAT* allocationTable;
 	struct DirectoryPage* rootDirectory;
 } RootSector;
 
 typedef struct DirectoryPage{
 	char name[NAME_MAX];
-	//[cmt] will also need a pointer to child file eventually (probably a pagenode pointer)
+	unsigned short index;
+	int isfile;
+	int size;
+	int currentposition;
 	struct DirectoryPage* parent;
 	struct DirectoryPage* childDir;
 	struct DirectoryPage* nextDir;
-}Directorypage;
+}DirectoryPage;
+
 
 typedef struct PageNode{
 	char type; //NULL->free, d->directory, r->rootsector, f->FAT, x->raw data

@@ -57,9 +57,8 @@ void filesystem(char *file)
 	}
 
 
-	blocksUsed(filesystem);	
+	//blocksUsed(filesystem);	
 	//checkFAT(filesystem);
-	
 	
 	//printf("%p \n", filesystem -> map);
 	//printf("%p \n", filesystem -> writeTo);
@@ -108,7 +107,7 @@ void filesystem(char *file)
 		}
 		else if(!strncmp(buffer, "usage", 5))
 		{
-			//usage();
+			usage(filesystem);
 		}
 		else if(!strncmp(buffer, "pwd", 3))
 		{
@@ -132,26 +131,26 @@ void filesystem(char *file)
 		}
 		else if(!strncmp(buffer, "write ", 6))
 		{
-			//char *filename = buffer + 6;
+			char *filename = buffer + 6;
 			char *space = strstr(buffer+6, " ");
 			*space = '\0';
 			size_t amt = atoi(space + 1);
 			space = strstr(space+1, " ");
 
 			char *data = generateData(space+1, amt<<1);
-			//write(filename, amt, data);
+			myWrite(filesystem, filename, amt, data);
 			free(data);
 		}
 		else if(!strncmp(buffer, "append ", 7))
 		{
-			//char *filename = buffer + 7;
+			char *filename = buffer + 7;
 			char *space = strstr(buffer+7, " ");
 			*space = '\0';
 			size_t amt = atoi(space + 1);
 			space = strstr(space+1, " ");
 
 			char *data = generateData(space+1, amt<<1);
-			//append(filename, amt, data);
+			append(filesystem,filename, amt, data);
 			free(data);
 		}
 		else if(!strncmp(buffer, "getpages ", 9))
@@ -188,6 +187,11 @@ void filesystem(char *file)
 		{
 			//undelete(buffer + 9);
 		}
+		else if(!strncmp(buffer, "FAT", 3))
+		{
+			checkFAT(filesystem);
+		}
+		
 
 		free(buffer);
 		buffer = NULL;
@@ -197,8 +201,129 @@ void filesystem(char *file)
 
 }
 
-void usage(struct FileSystem* filesystem){
+void cat(struct FileSystem* filesystem, char* filename){
+  
+  if(filesystem->currentDirectory->childDir){
+    struct DirectoryPage* temp=filesystem->currentDirectory->childDir;
+    //if(strncmp(temp->name, filename)!=0){
+    while(strcmp(temp->name,filename)!=0){
+      if(temp->nextDir)
+	temp=temp->nextDir;
+      else
+	break;
+    }
+    
+    if(!temp->isfile && strcmp(temp->name,filename)==0){
+      printf("%s is a directory\n", filename);
+    }
+    
+    else if(strcmp(temp->name,filename)!=0){
+      printf("File %s not found in directory\n", filename);
+    }
+    /*if(!temp->isfile){
+      printf("%s is a directory\n", filename);
+      }*/
+    else{
+      // dump(stdout, temp->index, filesystem);
+      unsigned char* bytes = filesystem->map+512*(temp->index);
+      int i=0;
+      int lastbyte=0;
+      while(i<512){
+	//printf("%02x ", bytes[i]);
+	if((unsigned)bytes[i]!=0){
+	  lastbyte=i;
+	}
+	i++; //get last bytes
+      }
+      int j=0;
+      for(j=0;j<=lastbyte; j++){
+	 printf("%02X ", (unsigned)bytes[j]);
+	//printf("%d %c ", (char)bytes[j]);
+      }
+  
+  
+    }
+  }
+}
 
+void myWrite(struct FileSystem* filesystem, char* filename, size_t amt, char* data){
+ 
+ 
+    struct DirectoryPage* newchild=filesystem->writeTo; 
+ 
+    unsigned short filestartpos=filesystem->rootSec->currenttableposition;
+    filesystem->writeTo+=PAGE_SIZE;
+    filesystem=SequentialFATentry(filesystem, 'f', NULL, 1);
+                                    
+									      
+    
+    newchild->isfile=1;
+    newchild->index=filestartpos;
+    newchild->parent=filesystem->currentDirectory;
+    strncpy(newchild->name,filename, NAME_MAX);
+    
+    // filesystem=FATentry(filesystem, 'f', NULL, (unsigned short)((amt+(512-(amt%512)))/512));
+    newchild->nextDir=NULL;
+    newchild->childDir=NULL;
+    if(filesystem->currentDirectory->childDir){
+      struct DirectoryPage* temp=filesystem->currentDirectory->childDir;
+      while(temp->nextDir){
+	temp=temp->nextDir;
+      }
+      temp->nextDir=newchild;
+    }
+    else{
+      filesystem->currentDirectory->childDir=newchild;
+    }
+    memcpy(filesystem->writeTo, data, amt);
+    
+    if(amt%PAGE_SIZE==0){
+      filesystem->writeTo+=amt;
+      filesystem=SequentialFATentry(filesystem, 'f', NULL, (unsigned short)(amt/512));
+    }
+
+    else{
+      filesystem->writeTo+=amt+(PAGE_SIZE-(amt%PAGE_SIZE)); //update
+							    //writeTo
+      filesystem=SequentialFATentry(filesystem, 'f', NULL, (unsigned short)((amt+(512-(amt%512)))/512));
+    }
+
+    int noPages = 0;
+    noPages = 1 + (amt/512);
+
+    if(amt%512 > 0){
+    	noPages++;
+    }
+
+    newchild->size = noPages;
+    newchild->parent->size += noPages;
+    newchild->currentposition = amt;
+
+}
+
+void append(struct FileSystem* filesystem, char* filename, size_t amt, char* data){
+	 struct DirectoryPage* child=filesystem->currentDirectory->childDir;
+	if(filesystem->currentDirectory->childDir){
+		
+		while(strncmp(child->name,filename, NAME_MAX)!=0){
+			if(child->nextDir){
+			child=child->nextDir;
+		    } 
+	     }
+    }
+    else{
+    	return;
+    }
+		unsigned char* currentpos=(filesystem->map+(512*(child->index+1))+child->currentposition);
+
+        memcpy(currentpos, data, amt);
+		//currentposition=currentposition+amt;
+		child->currentposition=child->currentposition+amth;
+
+}
+void usage(struct FileSystem* filesystem){
+	printf("bytes used: %d \n", filesystem->blocksUsed*512);
+	printf("bytes used by files: %d \n", filesystem->fileCt*512);
 }
 
 
@@ -266,8 +391,10 @@ void pwd(struct FileSystem* filesystem){
 	tmp = pop();
 	while(tmp){
 		printf("%s", tmp -> name);
-		printf("/");
 		tmp = pop();
+		if(tmp){
+			printf("/");
+		}
 	}
 	printf("\n");
 }
@@ -284,8 +411,14 @@ void cd(char* dirname, struct FileSystem* filesystem){
 	//named directory case
 	struct DirectoryPage* tmp = filesystem -> currentDirectory -> childDir;
 	while(tmp){
+
 		if(strcmp(dirname, tmp->name) == 0){
+			if(tmp->isfile){
+				printf("-bash cd: %s: Not a directory\n", tmp->name);
+			}
+			else{
 			filesystem -> currentDirectory = tmp;
+			}
 		}
 		tmp = tmp -> nextDir;
 	}
@@ -293,11 +426,16 @@ void cd(char* dirname, struct FileSystem* filesystem){
 }
 
 void ls(struct FileSystem* filesystem){
-	printf("current directory: %s \n", filesystem -> currentDirectory -> name);
-	
 	if(filesystem -> currentDirectory -> childDir){
 		struct DirectoryPage* tmp = filesystem -> currentDirectory -> childDir;
 		while(tmp){
+			if(tmp->isfile){
+				printf("f ");
+			}
+			else{
+				printf("d ");
+			}
+			printf("%d ", tmp->size*512);
 			printf("%s \n", tmp -> name);
 			tmp = tmp -> nextDir;
 		}
@@ -325,6 +463,7 @@ void myMkdir(char* dirname, struct FileSystem* filesystem){
 	
 	//create the new directory page and increment write pointer one block
 	struct DirectoryPage* new = filesystem -> writeTo;
+	new -> size = 1;
 	filesystem -> writeTo += PAGE_SIZE;
 	new -> parent = filesystem -> currentDirectory;
 	strncpy(new -> name, dirname, NAME_MAX);
@@ -341,13 +480,19 @@ void myMkdir(char* dirname, struct FileSystem* filesystem){
 	else{
 		filesystem -> currentDirectory -> childDir = new;
 	}
+	
+	//increment counts and make FAT entry
+	filesystem -> blocksUsed++;
+	FATentry(filesystem, 'd', NULL, filesystem -> rootSec -> currenttableposition);
+	filesystem -> rootSec -> currenttableposition++;
 }
 
 struct FileSystem* verifyFileSystem(char* file){
-	printf("verifying \n");
-
 	struct FileSystem* filesystem;
-	void * map;
+
+	printf("verifying \n");
+	
+	char * map;
 
 	int fd = open(file, O_RDWR, 0777);
 	if (fd == -1){
@@ -363,8 +508,9 @@ struct FileSystem* verifyFileSystem(char* file){
         exit(EXIT_FAILURE);
     }
 	
-  filesystem = (struct FileSystem*)map;
-    
+	filesystem = (struct FileSystem*)map;
+  	//*filesystem = *(struct FileSystem*)map;
+	
 	return filesystem;
 }
 
@@ -373,7 +519,7 @@ struct FileSystem* initializeFileSystem(char* file){
 	printf("initializing \n");
 
 	struct FileSystem* filesystem;
-	void* map;
+	char* map;
 
 	//open/expand file, map memory, handle errors
 	int fd = open(file, O_RDWR | O_CREAT | O_TRUNC, 0777);
@@ -391,7 +537,7 @@ struct FileSystem* initializeFileSystem(char* file){
     }
 
 	//initialize the filesystem struct into the mapped memory
-	filesystem = map;
+	filesystem = (struct FileSystem*)map;
 	filesystem -> writeTo = map;
 	filesystem -> map = map;
 
@@ -430,7 +576,40 @@ struct FileSystem* initializeFileSystem(char* file){
 	}
 	FATentry(filesystem, 'd', NULL, 385); //root directory
 	
+	//initialize counts
+	filesystem -> blocksUsed = 386;
+	filesystem -> fileCt = 0;
+	
+	filesystem -> rootSec -> currenttableposition = 386;
+	
 	return filesystem;
+}
+
+struct FileSystem* SequentialFATentry(struct FileSystem* filesystem, char type, struct PageNode* prev,unsigned short end){
+	//ic ndex into allocation table
+	struct PageNode* entry = filesystem -> rootSec -> allocationTable -> table;
+	unsigned short i;
+	printf("current free position: %d\n", filesystem->rootSec->currenttableposition);
+	printf("end: %d\n", end);
+	for(i=filesystem -> rootSec -> currenttableposition; i<(filesystem -> rootSec -> currenttableposition+end); i++){
+	     entry[i].next=&entry[i+1];
+	     /* if(entry[i-1]!=NULL){
+	       entry[i]->prev=entry[i-1];
+	       }*/
+	//update attributes
+	     entry[i].type = type;
+	     entry[i].mapindex = i;
+	}
+	filesystem->rootSec->currenttableposition=filesystem -> rootSec -> currenttableposition+end;
+	return filesystem;
+	//printf("a: %d\n", filesystem->rootSec->currenttableposition);
+	//return filesystem->rootSec->currenttableposition;
+	//link from other nodes if necessary
+	//if(prev){
+	//	prev -> next = entry;
+	     //	}
+	
+	//return entry;
 }
 
 //updates FAT entry for some page and links from previous if necessary. Argument prev is optional
