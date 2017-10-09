@@ -33,6 +33,8 @@ void cat(struct FileSystem* filesystem, char* filename);
 void myWrite(struct FileSystem* filesystem, char* filename, size_t amt, char* data);
 struct FileSystem* SequentialFATentry(struct FileSystem* filesystem, char type, struct PageNode* prev,unsigned short end);
 void append(struct FileSystem* filesystem, char* filename, size_t amt, char* data);
+void rm(struct FileSystem* filesystem, char* filename);
+int checkWriteTo(struct FileSystem* filesystem);
 
 //utility prototypes
 struct FileSystem* verifyFileSystem(char* file);
