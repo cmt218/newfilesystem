@@ -35,6 +35,7 @@ struct FileSystem* SequentialFATentry(struct FileSystem* filesystem, char type, 
 void append(struct FileSystem* filesystem, char* filename, size_t amt, char* data);
 void rm(struct FileSystem* filesystem, char* filename);
 int checkWriteTo(struct FileSystem* filesystem);
+void getpages(struct FileSystem* filesystem, char* filename);
 
 //utility prototypes
 struct FileSystem* verifyFileSystem(char* file);

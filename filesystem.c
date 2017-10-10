@@ -201,6 +201,71 @@ void filesystem(char *file)
 
 }
 
+void getpages(struct FileSystem* filesystem, char* filename){
+
+ struct PageNode* entry = filesystem -> rootSec -> allocationTable -> table;
+
+ if(filesystem->currentDirectory->childDir){
+
+   //printf("%s\n", "we are here");                                                                                                                        
+
+   struct DirectoryPage* temp=filesystem->currentDirectory->childDir;
+
+   while (temp){
+   // printf ("%s\n", temp);                                                                                                                                
+   //printf("%d\n", strcmp(temp, filename));                                                                                                                
+
+          if(strcmp(temp->name, filename) == 0){
+       if(temp->isfile == 1){
+
+     //printf("%s\n", "in while");                                                                                                                          
+
+       entry += temp->index;
+
+     while (entry->next){
+
+       printf("%d, ", entry->mapindex);
+ entry=entry->next;
+     }
+
+       }
+       else{
+
+         printf("%d, ", temp->index);
+
+         if (temp->childDir){
+
+           DirectoryPage* curr = temp->childDir;
+
+           getpages(filesystem, curr->name);
+
+           while(curr->nextDir){
+             curr = curr->nextDir;
+             getpages(filesystem, curr->name);
+           }
+
+         }
+         else{
+           break;
+         }
+ }
+     }
+
+     if(temp->nextDir){
+
+       temp = temp->nextDir;
+     }
+     else{
+       break;
+     }
+   }
+   if(strcmp(temp->name,filename)!=0){
+     printf("File %s not found in directory\n", filename);
+   }
+ }
+}
+
+
 int checkWriteTo(struct FileSystem* filesystem){
   unsigned char* bytes=filesystem->writeTo;
   int isfilled=0;
@@ -232,6 +297,7 @@ void rm(struct FileSystem* filesystem, char* filename){
       else{
 	filesystem->currentDirectory->childDir=NULL;
       }
+      temp->parent->size-=temp->size;
       unsigned char* bytes=filesystem->map+512*childpos; 
 
 
@@ -261,6 +327,7 @@ void rm(struct FileSystem* filesystem, char* filename){
 	  else{
 	    temp->nextDir=NULL;
 	  }
+	  temp->parent->size-=nextsize;
 	  unsigned char* bytes=filesystem->map+512*nextpos;
 	  filesystem->rootSec->currenttableposition=nextpos;
 	  memset(bytes, 0x00, 512*nextsize);
@@ -277,7 +344,7 @@ void rm(struct FileSystem* filesystem, char* filename){
 
 	int childpos=temp->index;
 	unsigned char* bytes=filesystem->map+512*childpos;
-
+	temp->parent->size-=temp->size;
 
 	filesystem->rootSec->currenttableposition=childpos;
 	memset(bytes, 0x00, 512*childsize);
@@ -286,27 +353,9 @@ void rm(struct FileSystem* filesystem, char* filename){
       }
       }
       temp=temp->nextDir;
-
-
       }
-      //if (temp->nextDir==NULL){
-      /*if(strcmp(temp->name, filename) == 0) {
-	  int childsize=temp->size;
-	  int childpos=temp->index;
-	  unsigned char* bytes=filesystem->map+512*childpos;
-	  filesystem->rootSec->currenttableposition=childpos;
-	  memset(bytes, 0x00, 512*childsize);
-	  filesystem->writeTo=&bytes[0];
-	  }*/
-	//	    }
     }
-	       
-
-
   }
-
-
-
 }
 
 void cat(struct FileSystem* filesystem, char* filename){
@@ -607,10 +656,13 @@ void myMkdir(char* dirname, struct FileSystem* filesystem){
 		filesystem -> currentDirectory -> childDir = new;
 	}
 	
+	filesystem->currentDirectory->childDir->index = filesystem->rootSec->currenttableposition;
+
 	//increment counts and make FAT entry
 	filesystem -> blocksUsed++;
 	FATentry(filesystem, 'd', NULL, filesystem -> rootSec -> currenttableposition);
 	filesystem -> rootSec -> currenttableposition++;
+
 }
 
 struct FileSystem* verifyFileSystem(char* file){
@@ -627,8 +679,9 @@ struct FileSystem* verifyFileSystem(char* file){
     }
     //lseek(fd, FOUR_MB, SEEK_SET);
     //write(fd, "", 1);
-    map = mmap(NULL, FOUR_MB, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	
+    //map = mmap(NULL, FOUR_MB, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	map = mmap((void*) 0x7ffff7be0000, FOUR_MB, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
+
 	if (map == MAP_FAILED){
         close(fd);
         perror("Error mmapping the file");
@@ -636,6 +689,8 @@ struct FileSystem* verifyFileSystem(char* file){
     }
 	
 	filesystem = (struct FileSystem*)map;
+	//filesystem -> map = map;
+
   	//*filesystem = *(struct FileSystem*)map;
 	
 	return filesystem;
@@ -656,7 +711,8 @@ struct FileSystem* initializeFileSystem(char* file){
     } 
     lseek(fd, FOUR_MB, SEEK_SET);
     write(fd, "", 1);
-	map = mmap(NULL, FOUR_MB, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	//map = mmap(NULL, FOUR_MB, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	map = mmap((void*) 0x7ffff7be0000, FOUR_MB, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
 	if (map == MAP_FAILED){
         close(fd);
         perror("Error mmapping the file");
